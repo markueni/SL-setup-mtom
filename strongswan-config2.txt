@@ -1,0 +1,69 @@
+# sun-ubuntu
+ip route add 129.241.208.79/32 via 10.2.0.2 dev eth1
+
+##### Sun
+# https://www.strongswan.org/testing/testresults/ikev1/rw-ntru-psk/index.html
+# /etc/ipsec.secrets
+cat >/etc/ipsec.secret <<EOF
+# source      destination
+sun.strongswan.org sgx.client@strongswan.com : PSK "87zRQqylaoeF5I8o4lRhwvmUzf+pYdDpsCOlesIeFA/2xrtxKXJTbCPZgqplnXgPX5uprL+aRgxD8ua7MmdWaQ"
+EOF
+
+# /etc/ipsec.conf
+cat >/etc/ipsec.conf <<EOF
+# basic configuration
+config setup
+	charondebug="all"
+	uniqueids=yes
+	strictcrlpolicy=no
+
+conn rw-sgx-client
+	authby=secret
+	left=129.241.209.228
+	leftid=sun.strongswan.org
+	leftsubnet=10.2.0.0/16
+	right=129.241.208.79
+	rightid=sgx.client@strongswan.com
+	ike=aes256-sha2_256-modp1024!
+	esp=aes256-sha2_256!
+	keyingtries=0
+	ikelifetime=1h
+	lifetime=8h
+	dpddelay=30
+	dpdtimeout=120
+	auto=route
+EOF
+
+
+# sgx.client
+# /etc/ipsec.secrets
+cat >/etc/ipsec.secret <<EOF
+# source      destination
+sgx.client@strongswan.com sun.strongswan.org : PSK "87zRQqylaoeF5I8o4lRhwvmUzf+pYdDpsCOlesIeFA/2xrtxKXJTbCPZgqplnXgPX5uprL+aRgxD8ua7MmdWaQ"
+EOF
+
+# /etc/ipsec.conf
+# /etc/ipsec.conf
+cat >/etc/ipsec.conf <<EOF
+# basic configuration
+config setup
+	charondebug="all"
+	uniqueids=yes
+	strictcrlpolicy=no
+
+conn sgx-client-to-sun
+	authby=secret
+	left=129.241.208.79
+	leftid=sgx.client@strongswan.com
+	right=129.241.209.228
+	rightid=sun.strongswan.org
+	rightsubnet=10.2.0.0/16
+	ike=aes256-sha2_256-modp1024!
+	esp=aes256-sha2_256!
+	keyingtries=0
+	ikelifetime=1h
+	lifetime=8h
+	dpddelay=30
+	dpdtimeout=120
+	auto=route
+EOF
