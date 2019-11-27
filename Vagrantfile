@@ -37,7 +37,7 @@ Vagrant.configure('2') do |config|
     config.vm.hostname = config_sun_fqdn
     config.vm.network :private_network, ip: config_sun_ip, libvirt__forward_mode: 'route', libvirt__dhcp_enabled: false
     config.vm.network :private_network, ip: config_sun_internal_ip, netmask: '255.255.0.0', libvirt__forward_mode: 'route', libvirt__dhcp_enabled: false
-    config.vm.network :public_network, use_dhcp_assigned_default_route: true, bridge: "enp5s0"
+    config.vm.network :public_network, use_dhcp_assigned_default_route: true, bridge: "eno1"
     config.vm.provision :shell, inline: "echo '#{config_moon_ip} #{config_moon_fqdn}' >>/etc/hosts"
     config.vm.provision :shell, inline: "echo '#{config_sun_ip} #{config_sun_fqdn}' >>/etc/hosts"
     config.vm.provision :shell, path: 'provision-common.sh'
