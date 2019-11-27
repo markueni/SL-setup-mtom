@@ -9,8 +9,8 @@ sudo apt-get -y install libssl-dev libcurl4-openssl-dev libprotobuf-dev
 sudo apt-get -y install build-essential python
 
 sudo ./sgx_linux_x64_driver_2.6.0_4f5bb63.bin 
-sudo dpkg -i ./libsgx-enclave-common_2.7.100.4-bionic1_amd64.deb
-sudo dpkg -i ./libsgx-enclave-common-dbgsym_2.7.100.4-bionic1_amd64.ddeb
+sudo dpkg -i ./libsgx-enclave-common_2.7.101.3-bionic1_amd64.deb
+sudo dpkg -i ./libsgx-enclave-common-dbgsym_2.7.101.3-bionic1_amd64.ddeb
 echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu bionic main' | sudo tee /etc/apt/sources.list.d/intelsgx.list
 
 wget -qO- https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | sudo apt-key add -
@@ -19,7 +19,7 @@ sudo apt-get -y install libsgx-enclave-common
 sudo apt-get -y install libsgx-enclave-common-dbgsym
 
 # echo 'yes' | ./sgx_linux_x64_sdk_2.7.100.4.bin
-sudo ./sgx_linux_x64_sdk_2.7.100.4.bin --prefix=/opt/intel
+sudo ./sgx_linux_x64_sdk_2.7.101.3.bin --prefix=/opt/intel
 
 # Libiraries for compiling sgx sever code!
 sudo apt-get -y install autotools-dev
