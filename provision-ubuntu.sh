@@ -7,10 +7,12 @@ if  [ "$(hostname)" = 'moon-ubuntu' ]; then
 local='moon-ubuntu'
 remote='sun-ubuntu'
 remote_ip='10.2.0.4'
+#remote_ip='169.254.3.4'
 else
 local='sun-ubuntu'
 remote='moon-ubuntu'
 remote_ip='10.1.0.4'
+#remote_ip='169.253.3.4'
 fi
 
 # install node LTS.
