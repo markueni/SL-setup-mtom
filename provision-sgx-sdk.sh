@@ -18,7 +18,7 @@ sudo apt-get -y update
 sudo apt-get -y install libsgx-enclave-common
 sudo apt-get -y install libsgx-enclave-common-dbgsym
 
-# echo 'yes' | ./sgx_linux_x64_sdk_2.7.100.4.bin
+# echo 'yes' | ./sgx_linux_x64_sdk_2.7.101.3.bin
 sudo ./sgx_linux_x64_sdk_2.7.101.3.bin --prefix=/opt/intel
 
 # Libiraries for compiling sgx sever code!
