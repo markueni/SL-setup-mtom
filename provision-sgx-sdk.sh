@@ -7,7 +7,7 @@ cd /usr/src/sdk
 
 sudo apt-get -y install libssl-dev libcurl4-openssl-dev libprotobuf-dev
 sudo apt-get -y install build-essential python
-
+sudo chmod 755 *.bin *.deb *.ddeb
 sudo ./sgx_linux_x64_driver_2.6.0_4f5bb63.bin 
 sudo dpkg -i ./libsgx-enclave-common_2.7.101.3-bionic1_amd64.deb
 sudo dpkg -i ./libsgx-enclave-common-dbgsym_2.7.101.3-bionic1_amd64.ddeb
