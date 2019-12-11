@@ -15,14 +15,14 @@ QUERY_IAS_PRODUCTION=0
 # Your Service Provider ID. This should be a 32-character hex string.
 # [REQUIRED]
 
-SPID=FD53E072B4765A1A5270A8A7E68D73CE
+SPID=2321E0674BCFF30BBB57FF77E9A1EEA0
 
 
 # Set to a non-zero value if this SPID is associated with linkable
 # quotes. If you change this, you'll need to change SPID,
 # IAS_PRIMARY_SUBSCRIPTION_KEY and IAS_SECONDARY_SUBSCRIPTION_KEY too.
 
-LINKABLE=0
+LINKABLE=1
 
 
 #======================================================================
@@ -50,12 +50,12 @@ USE_PLATFORM_SERVICES=0
 # More Info: https://api.portal.trustedservices.intel.com/EPID-attestation
 # Associated SPID above is required
 
-IAS_PRIMARY_SUBSCRIPTION_KEY=0b05e6c34a084e6ea86e5593b7220c39
+IAS_PRIMARY_SUBSCRIPTION_KEY=06a41f702e4f40f3ae7a4e59e7991d3a
 
 # Intel Attestation Service  Secondary Subscription Key
 # This will be used in case the primary subscription key does not work
 
-IAS_SECONDARY_SUBSCRIPTION_KEY=f7e642e86f034dbfb243b49d084e4ef9
+IAS_SECONDARY_SUBSCRIPTION_KEY=41b72a0a7e4e4f03828e3399dbd2a901
 
 # The Intel IAS SGX Report Signing CA file. You are sent this certificate
 # when you apply for access to SGX Developer Services at
