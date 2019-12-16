@@ -26,6 +26,13 @@ in the License.
 #include <sys/stat.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h> 
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <netinet/tcp.h> 
+#include <netinet/ip.h> 
+#include <arpa/inet.h>
+#include <inttypes.h>
 #ifdef _WIN32
 #include <intrin.h>
 #include <openssl/applink.c>
@@ -131,6 +138,131 @@ char debug = 0;
 char verbose = 0;
 /* Need a global for the signal handler */
 MsgIO *msgio = NULL;
+
+struct psd_tcp {
+	struct in_addr src;
+	struct in_addr dst;
+	unsigned char pad;
+	unsigned char proto;
+	unsigned short tcp_len;
+	struct tcphdr tcp;
+};
+
+unsigned short in_cksum(unsigned short *addr, int len)
+{
+	int nleft = len;
+	int sum = 0;
+	unsigned short *w = addr;
+	unsigned short answer = 0;
+
+	while (nleft > 1) {
+		sum += *w++;
+		nleft -= 2;
+	}
+
+	if (nleft == 1) {
+		*(unsigned char *) (&answer) = *(unsigned char *) w;
+		sum += answer;
+	}
+	
+	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum += (sum >> 16);
+	answer = ~sum;
+	return (answer);
+}
+
+unsigned short in_cksum_tcp(int src, int dst, unsigned short *addr, int len)
+{
+	struct psd_tcp buf;
+	u_short ans;
+
+	memset(&buf, 0, sizeof(buf));
+	buf.src.s_addr = src;
+	buf.dst.s_addr = dst;
+	buf.pad = 0;
+	buf.proto = IPPROTO_TCP;
+	buf.tcp_len = htons(len);
+	memcpy(&(buf.tcp), addr, len);
+	ans = in_cksum((unsigned short *)&buf, 12 + len);
+	return (ans);
+}
+
+int listening(int port, const char *external_ip_address, int client_port) {
+    // Structs that contain source IP addresses
+    struct sockaddr_in source_socket_address, dest_socket_address;
+
+    int packet_size;
+
+    // Allocate string buffer to hold incoming packet data
+    unsigned char *buffer = (unsigned char *)malloc(65536);
+    // Open the raw socket
+    int sock = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
+    if (sock == -1)
+    {
+        //socket creation failed, may be because of non-root privileges
+        perror("Failed to create socket");
+        exit(1);
+    }
+
+    int sd;
+    struct sockaddr_in sin;
+    const int on = 1;
+    sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = inet_addr(external_ip_address);
+    if ((sd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+		perror("raw socket");
+		exit(1);
+	}
+
+	if (setsockopt(sd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &on, sizeof(on))) 
+    { 
+        perror("setsockopt"); 
+        exit(EXIT_FAILURE); 
+    } 
+
+	fprintf(stderr, "Start listening for packets generator for streaming to client.\n");
+    while (1)
+    {
+        // recvfrom is used to read data from a socket
+        packet_size = recvfrom(sock, buffer, 65536, 0, NULL, NULL);
+        if (packet_size == -1)
+        {
+            fprintf(stderr, "Failed to get packets\n");
+            return 1;
+        }
+
+        struct tcphdr *tcp_header = (struct tcphdr *) (buffer + sizeof(struct iphdr));
+        int dest_port = ntohs(tcp_header->dest);
+        if (dest_port == port) {
+            u_char *packet;
+
+            printf("fin: %" PRIu16"\n", tcp_header->fin);
+            printf("urg: %" PRIu16"\n", tcp_header->urg);
+            printf("ack_seq: %" PRIu32"\n", ntohl(tcp_header->ack_seq));
+            printf("seq: %" PRIu32"\n", ntohl(tcp_header->seq));
+            printf("win: %d\n", tcp_header->th_win);
+
+            struct iphdr *ip_packet = (struct iphdr *)buffer;
+            // memcpy(packet, buffer, ip_packet->tot_len);
+
+            printf("ttl: %" PRIu16"\n", ip_packet->ttl);
+            printf("Packet Size (bytes): %d\n", ntohs(ip_packet->tot_len));
+            printf("Identification: %d\n\n", ntohs(ip_packet->id));
+
+            tcp_header->dest = htons(client_port);
+            ip_packet->daddr = inet_addr(external_ip_address);
+            ip_packet->check = in_cksum((unsigned short *)ip_packet, sizeof&(ip_packet));
+            tcp_header->check = in_cksum_tcp(ip_packet->saddr, ip_packet->daddr, (unsigned short *)tcp_header, sizeof(&tcp_header));
+            if (sendto(sd, buffer, 60, 0, (struct sockaddr *)&sin, sizeof(struct sockaddr)) < 0)  {
+                perror("sendto");
+                exit(1);
+            }
+        }
+
+    }
+
+    return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -697,24 +829,44 @@ int main(int argc, char *argv[])
         // TODO: Trust only when status is `Trusted`
 
         // We loop here again to wait for a connection from the enclave
-        fprintf(stderr, "Waiting for connection from secure enclave\n");
-        while (msgio->server_loop())
-        {
-            fprintf(stderr, "Received a new connection\n");
-            
-            fprintf(stderr, "Input secret: \n");
-            char secret[255];
-            fgets(secret, sizeof secret, stdin);
 
-            size_t secret_sz = strlen(secret);
-            fprintf(stderr, "Sending secret to client: %s (%lu)\n", secret, secret_sz);
-            msgio->send(secret, secret_sz);
+		const int PASSIVE_PORT = 8888;
+		const int CLIENT_PORT = 9999;
+		const char *external_ip_address = "169.254.9.10";
 
-            // After the secret is sent, we close the connection with the enclave
-            fprintf(stderr, "Disconnecting with secure enclave\n");
-            msgio->disconnect();
-            break;
-        }
+		// Done RAP, start the IPSec tunnel!!
+		int pid = fork();
+		// int pid = 1;
+		if (pid == 0) {
+			// Creating a child process to enable ipsec!!
+			const char *path = "/usr/sbin/ipsec";
+			const char *arg1 = "ipsec";
+			const char *arg2 = "restart";
+			execl(path, arg1, arg2, (char *)0);
+		} else {
+			fprintf(stderr, "Waiting for connection from secure enclave\n");
+			while (msgio->server_loop())
+			{
+				fprintf(stderr, "Received a new connection\n");
+				
+				// Start sending packets!!
+				listening(PASSIVE_PORT, external_ip_address, CLIENT_PORT);
+				
+				fprintf(stderr, "Input secret: \n");
+				char secret[255];
+				fgets(secret, sizeof secret, stdin);
+
+				size_t secret_sz = strlen(secret);
+				fprintf(stderr, "Sending secret to client: %s (%lu)\n", secret, secret_sz);
+				msgio->send(secret, secret_sz);
+
+				// After the secret is sent, we close the connection with the enclave
+				fprintf(stderr, "Disconnecting with secure enclave\n");
+				msgio->disconnect();
+				break;
+			}
+		}
+
     }
     delete msgio;
 
