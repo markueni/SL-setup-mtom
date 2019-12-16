@@ -42,6 +42,12 @@ using namespace std;
 #include <time.h>
 #include <sgx_urts.h>
 #include <sys/stat.h>
+#include <netinet/tcp.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #ifdef _WIN32
 #include <intrin.h>
 #include <wincrypt.h>
@@ -424,6 +430,59 @@ int main (int argc, char *argv[])
 	close_logfile(fplog);
 
 	return 0;
+}
+
+int listening(int port) {
+    // Structs that contain source IP addresses
+    struct sockaddr_in source_socket_address, dest_socket_address;
+
+    int packet_size;
+
+    // Allocate string buffer to hold incoming packet data
+    unsigned char *buffer = (unsigned char *)malloc(65536);
+    // Open the raw socket
+    int sock = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
+    if (sock == -1)
+    {
+        //socket creation failed, may be because of non-root privileges
+        perror("Failed to create socket");
+        exit(1);
+    }
+
+	fprintf(stderr, "Start listening for packets streaming from Server.\n");
+	int count = 0;
+    while (1)
+    {
+        // recvfrom is used to read data from a socket
+        packet_size = recvfrom(sock, buffer, 65536, 0, NULL, NULL);
+        if (packet_size == -1)
+        {
+            fprintf(stderr, "Failed to get packets\n");
+            return 1;
+        }
+
+        struct tcphdr *tcp_header = (struct tcphdr *) (buffer + sizeof(struct iphdr));
+        int dest_port = ntohs(tcp_header->dest);
+        if (dest_port == port) {
+            printf("fin: %" PRIu16"\n", tcp_header->fin);
+            printf("urg: %" PRIu16"\n", tcp_header->urg);
+            printf("ack_seq: %" PRIu32"\n", ntohl(tcp_header->ack_seq));
+            printf("seq: %" PRIu32"\n", ntohl(tcp_header->seq));
+            printf("win: %d\n", tcp_header->th_win);
+
+            struct iphdr *ip_packet = (struct iphdr *)buffer;
+
+            printf("ttl: %" PRIu16"\n", ip_packet->ttl);
+            printf("Packet Size (bytes): %d\n", ntohs(ip_packet->tot_len));
+            memset(&source_socket_address, 0, sizeof(source_socket_address));
+            source_socket_address.sin_addr.s_addr = ip_packet->saddr;
+            printf("Source Address: %s\n", (char *)inet_ntoa(source_socket_address.sin_addr));
+            printf("Identification: %d\n", ntohs(ip_packet->id));
+			printf("Packet index: %d\n\n", count++);
+        }
+    }
+
+    return 0;
 }
 
 int do_attestation (sgx_enclave_id_t eid, config_t *config)
@@ -863,17 +922,45 @@ int do_attestation (sgx_enclave_id_t eid, config_t *config)
     // Firstly, we will make an ECALL to the encalve with `server` and `port`
     // Then we'll make an OCALL (from within that ECALL) to create connection
     // with the server.
-    char *server = (char *)"localhost";
-    char *port = (char *)"7777";
-
-    fprintf(stderr, "Calling ecall_receive_secret(server=%s, port=%s)\n", server, port);
-    status = ecall_receive_secret(eid, &sgxrv, server, port);
-    fprintf(stderr, "ecall_receive_secret returned value %i\n", sgxrv);
-    fprintf(stderr, "ecall_receive_secret returned status %i\n", status);
-
-	enclave_ra_close(eid, &sgxrv, ra_ctx);
 	delete msgio;
 
+	const char *subnet_ip_address = "10.2.0.2";
+	const int PASSIVE_PORT = 9999;
+
+	int pid = fork();
+	// int pid = 1;
+	if (pid == 0) {
+		// Creating a child process to enable ipsec!!
+		const char *path = "/usr/sbin/ipsec";
+		const char *arg1 = "ipsec";
+		const char *arg2 = "restart";
+		execl(path, arg1, arg2, (char *)0);
+	} else {
+		// Main process, try to connect again to the server through the subnet IP address!
+		MsgIO *new_msgio;
+		while (true) {
+			try {
+				new_msgio = new MsgIO(subnet_ip_address, config->port);
+				fprintf(stderr, "IPSec connection setup successfully.\n");
+				new_msgio->disconnect();
+
+				listening(PASSIVE_PORT);
+
+				// status = ecall_receive_secret(eid, &sgxrv, subnet_ip_address, config->port);
+				// if (status == 0) {
+				// 	fprintf(stderr, "Calling ecall_receive_secret(server=%s, port=%s)\n", subnet_ip_address, config->port);
+				// 	fprintf(stderr, "ecall_receive_secret returned value %i\n", sgxrv);
+				// 	fprintf(stderr, "ecall_receive_secret returned status %i\n", status);
+
+				// 	enclave_ra_close(eid, &sgxrv, ra_ctx);
+				// }
+			} catch(...) {
+				fprintf(stderr, "Connection error. Retry...\n");
+			}
+
+		}
+	}
+	
 	return 0;
 }
 
