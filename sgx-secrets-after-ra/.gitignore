@@ -6,7 +6,7 @@ depcomp
 missing
 ref_sp
 public
-settings.*
+#settings.*
 win32/agent_win32.cpp
 win32/agent_win32.h
 .deps
@@ -31,7 +31,7 @@ Enclave/Enclave_t.c
 
 # sensitive files
 AttestationReportSigningCACert.pem
-settings
+#settings
 
 # successfull output
 1
